@@ -1,0 +1,67 @@
+name: Deploy Sphinx Docs to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ✔ FIX: instalación directa (SIN requirements.txt)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install sphinx
+
+      # ✔ Build Sphinx de forma explícita (más fiable que make)
+      - name: Build Sphinx HTML
+        run: |
+          sphinx-build -b html . _build/html
+
+      # ✔ FIX CRÍTICO: evitar Jekyll (_static, _images)
+      - name: Add .nojekyll (critical fix)
+        run: touch _build/html/.nojekyll
+
+      # Debug opcional
+      - name: Verify build output
+        run: |
+          echo "Checking build structure..."
+          ls -R _build/html | head -200
+
+      # Artifact para GitHub Pages
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _build/html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
